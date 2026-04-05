@@ -42,4 +42,132 @@
         .card { background: var(--card); padding: 1.5rem; border-radius: 1rem; box-shadow: var(--shadow); margin-bottom: 1.25rem; border-left: 6px solid var(--atp-blue); width: 100%; transition: transform 0.2s; }
         .card:hover { transform: translateY(-2px); }
         .card h2 { margin: 0 0 0.75rem 0; font-size: 1.2rem; color: var(--atp-blue); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;}
-        .card p { margin: 0.4rem 0; color: #4a
+        .card p { margin: 0.4rem 0; color: #4a5568; font-size: 1rem; display: flex; justify-content: space-between;}
+        .card p b { color: var(--text); }
+        
+        .mesa-badge { display: block; background: var(--atp-blue); color: white; padding: 0.75rem; border-radius: 0.75rem; font-weight: 800; font-size: 1.3rem; margin-top: 1.25rem; text-align: center; letter-spacing: 1px;}
+        
+        .empty { text-align: center; color: #718096; margin-top: 2rem; background: white; padding: 2rem; border-radius: 1rem; box-shadow: var(--shadow); width: 100%; border: 2px dashed #e2e8f0;}
+
+        /* Ajustes para celulares muy chicos */
+        @media (max-width: 360px) {
+            h1 { font-size: 1.4rem; }
+            .logo-atp { max-width: 140px; }
+            .card h2 { font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="logo.png" alt="Logo ATP" class="logo-atp">
+            <h1>¿Dónde voto?</h1>
+            <div class="subtitle">Ingresá tu DNI (sin puntos) o Apellido para consultar el padrón</div>
+        </div>
+        
+        <input type="text" id="buscador" class="search-box" placeholder="Ej: 40123456 o Perez..." autocomplete="off">
+        
+        <img src="flyer.jpg" alt="Información importante ATP" class="flyer-atp">
+        <a href="https://www.instagram.com/p/DWuarh2gQcB/?img_index=1" target="_blank" class="link-propuestas">🔗 Nuestras propuestas</a>
+        
+        <div id="resultados" style="width: 100%;">
+            <div class="empty">Escribí al menos 3 caracteres para iniciar la búsqueda.</div>
+        </div>
+    </div>
+
+    <script src="datos.js"></script>
+
+    <script>
+        const buscador = document.getElementById('buscador');
+        const resultados = document.getElementById('resultados');
+
+        // Verificamos si se cargó el archivo datos.js
+        if (typeof padron === 'undefined') {
+            resultados.innerHTML = '<div class="card" style="border-left-color: #ef4444;"><p><b>Error crítico:</b> No se encontró el archivo de datos (<code>datos.js</code>). Asegurate de que esté en la misma carpeta.</p></div>';
+        }
+
+        // Función para normalizar texto (quita tildes y pasa a minúscula)
+        function normalizar(str) {
+            if (!str) return "";
+            return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        }
+
+        // Cortes de mesa EXACTOS provistos
+        const cortes = {
+            "MEDICINA": [
+                { mesa: "1°", fin: "Benavides, Melani Ayelen" },
+                { mesa: "2", fin: "Challco Achahui, Cristian Nahuel" },
+                { mesa: "3", fin: "De Souza Lopes, Dejandeson Alex" },
+                { mesa: "4", fin: "Gambini, Victoria" },
+                { mesa: "5", fin: "Juncos, Matias Nahuel" },
+                { mesa: "6", fin: "Merlo, Victoria" },
+                { mesa: "7", fin: "Palavecino Paez, Greta" },
+                { mesa: "8", fin: "Rocha De Mello Souza, Julia" },
+                { mesa: "9", fin: "Souza Da Silva, Ana Paula" },
+                { mesa: "10", fin: "ZZZZZZ" } // Fin padrón Medicina
+            ],
+            "FONOAUDIOLOGIA": [
+                { mesa: "11", fin: "Laurito Ortiz, Iara" },
+                { mesa: "12", fin: "ZZZZZZ" } // Fin padrón Fono
+            ],
+            "ENFERMERIA": [
+                { mesa: "13", fin: "Fernandez, Diana Carina" },
+                { mesa: "14", fin: "Orozco, Amanda Isabel" },
+                { mesa: "15", fin: "ZZZZZZ" } // Fin padrón Enfermería
+            ]
+        };
+
+        // Lógica de determinación de mesa
+        function determinarMesa(nombre, escuela) {
+            let n = normalizar(nombre);
+            let esc = normalizar(escuela);
+            
+            let clave = esc.includes("medicina") ? "MEDICINA" :
+                        esc.includes("fonoaudiologia") ? "FONOAUDIOLOGIA" :
+                        esc.includes("enfermeria") ? "ENFERMERIA" : null;
+            
+            if (!clave) return "?";
+
+            let mesas = cortes[clave];
+            for (let m of mesas) {
+                // Compara alfabéticamente incluyendo el nombre exacto del corte
+                if (n <= normalizar(m.fin) + "\uFFFF") {
+                    return m.mesa;
+                }
+            }
+            return mesas[mesas.length - 1].mesa; // Fallback al último corte
+        }
+
+        // Buscador en tiempo real
+        buscador.addEventListener('input', (e) => {
+            if (typeof padron === 'undefined') return;
+            
+            let val = normalizar(e.target.value);
+            if (val.length < 3) {
+                resultados.innerHTML = '<div class="empty">Escribí al menos 3 caracteres para iniciar la búsqueda.</div>';
+                return;
+            }
+
+            // Busca coincidencia en DNI o Nombre (limita a 20 resultados por performance en celu)
+            let matches = padron.filter(p => normalizar(p.dni).includes(val) || normalizar(p.nombre).includes(val)).slice(0, 20);
+
+            if (matches.length === 0) {
+                resultados.innerHTML = '<div class="empty">No se encontraron resultados para "'+e.target.value+'".</div>';
+                return;
+            }
+
+            resultados.innerHTML = matches.map(p => {
+                let mesaNum = determinarMesa(p.nombre, p.escuela);
+                return `
+                    <div class="card">
+                        <h2>${p.nombre}</h2>
+                        <p><span>DNI</span> <b>${p.dni}</b></p>
+                        <p><span>Carrera</span> <b>${p.escuela}</b></p>
+                        <div class="mesa-badge">MESA ${mesaNum}</div>
+                    </div>
+                `;
+            }).join('');
+        });
+    </script>
+</body>
+</html>
